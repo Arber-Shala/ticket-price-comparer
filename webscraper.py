@@ -14,6 +14,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 from selenium.webdriver.common.keys import Keys
+from webdriver_manager.chrome import ChromeDriverManager # pip install webdriver-manager
+from selenium.webdriver.chrome.service import Service
 
 class ScrapePrices():
     '''
@@ -50,8 +52,6 @@ class ScrapePrices():
         '''creates user agents using proxy ip addresses saved in .txt files'''
         # get list of proxies to use
         proxies = []
-        # selenium Options() function used to customize browser behaviour
-        options = Options()
         # create user agent
         user_agent = UserAgent() 
         user_string = user_agent.random # creates a random browser
@@ -59,30 +59,29 @@ class ScrapePrices():
         with open("proxies.txt", 'r') as file:
             for line in file:
                 proxies.append(line)
-                # add proxy IP to the selenium driver
-                options.add_argument(f'--proxy-server={line}')
-        # enables webscraping without GUI opening
-        options.add_argument('--headless')
 
         # get a random proxy
         random_proxy = random.choice(proxies)
 
-        # define selenium options
+        # define selenium options for the proxy server IP addresses
         seleniumwire_options = {
             'proxy': {
-                'http': f'{random_proxy}',
-                'https': f'{random_proxy}',
+                'http': f'http://{random_proxy}',
+                'https': f'https://{random_proxy}',
                 'verify_ss1': False
             }
         }
-        # define options for google chrome webdriver
+        # define options for google chrome webdriver tocursomize behaviour
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument(f'--user-agent={user_string}')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.headless = True
+        service = Service(ChromeDriverManager().install())
 
         # add data to final driver to be used
-        self.driver = uc.Chrome(options=chrome_options, seleniumwire_options=seleniumwire_options)
+        # self.driver = uc.Chrome(options=chrome_options, seleniumwire_options=seleniumwire_options)
+        #self.driver = uc.Chrome(service = service, options=chrome_options, seleniumwire_options=seleniumwire_options)
+        self.driver = webdriver.Chrome(service=service, seleniumwire_options=seleniumwire_options, options=chrome_options)
 
     def run(self):
         '''runs functions of ScrapePrices() class'''
