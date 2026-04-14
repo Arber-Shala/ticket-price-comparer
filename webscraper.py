@@ -65,17 +65,82 @@ class ScrapePrices():
         opts.add_argument(
             f"user-agent={user_string}"
         )
-        self.driver = webdriver.Chrome(options=opts)
+        # self.driver = webdriver.Chrome(options=opts)
+        self.driver = uc.Chrome(options=opts) # use undetected_chromedriver because google blocks default selenium headless
+
     def getFlights(self):
         '''get each flight from the website'''
        
         self.driver.get('https://www.google.com/travel/flights/search?tfs=CBwQAhooEgoyMDI2LTEyLTIwagwIAhIIL20vMG5saDdyDAgDEggvbS8wamJzNRooEgoyMDI2LTEyLTMxagwIAxIIL20vMGpiczVyDAgCEggvbS8wbmxoN0ABSAFwAYIBCwj___________8BmAEB&tfu=EgoIABABGAAgAigL&hl=en&gl=ca&curr=CAD')
         time.sleep(5)  # let it settle
+        #==================================================================
+        soup = BeautifulSoup(self.driver.page_source, "html.parser")
+        print("Page title:", self.driver.title)
+        print("CAD in page:", "CAD" in self.driver.page_source)
+        print("Total <li> tags:", len(soup.find_all("li")))
+        print("Total <div> tags:", len(soup.find_all("div")))
+         #==================================================================
         try:
-            print("works")
+            # wait until page finishes opening before scraping
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "li.pIav2d"))
+            )
+            time.sleep(5)  # let remaining results render
+
+            # scroll to trigger lazy-loaded results
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+
+            # parse the HTML code of the site
+            soup = BeautifulSoup(self.driver.page_source, "html.parser")
+
+            # Google Flights wraps each result in a <li> inside ul.Rk10dc
+            result_items = soup.select("ul.Rk10dc li")      
+              
+            # create list of flight dictionaries
+            flights = list()
+            
+            for item in result_items:
+                try:
+                    flight = {}
+
+                    # Price — typically inside a div with class YMlIz or FpEdX
+                    price_el = item.select_one("div.YMlIz span, div.FpEdX span")
+                    flight["price"] = price_el.get_text(strip=True) if price_el else "N/A"
+
+                    # Airline name
+                    airline_el = item.select_one("div.sSHqwe span, span.h1fkLb")
+                    flight["airline"] = airline_el.get_text(strip=True) if airline_el else "N/A"
+
+                    # Departure and arrival times
+                    times = item.select("span.mv1WYe span[jscontroller]")
+                    if len(times) >= 2:
+                        flight["departure"] = times[0].get_text(strip=True)
+                        flight["arrival"] = times[1].get_text(strip=True)
+                    else:
+                        flight["departure"] = flight["arrival"] = "N/A"
+
+                    # Duration
+                    duration_el = item.select_one("div.Ak5kof div, span.pIgMWd")
+                    flight["duration"] = duration_el.get_text(strip=True) if duration_el else "N/A"
+
+                    # Stops
+                    stops_el = item.select_one("div.EfT7Ae span, span.ogfYpf")
+                    flight["stops"] = stops_el.get_text(strip=True) if stops_el else "N/A"
+
+                    # Only append if we found at least a price
+                    if flight["price"] != "N/A":
+                        flights.append(flight)
+
+                except Exception as e:
+                    print(f"Skipping a result due to parse error: {e}")
+                    continue
+
+                return flights
 
         except:
             # DEBUG: save screenshot and page source to inspect what loaded (CLAUDE)
+            print("Timed out waiting for results. Page may not have loaded.")
             self.driver.save_screenshot("debug.png")
             with open("debug.html", "w", encoding="utf-8") as f:
                 f.write(self.driver.page_source)
@@ -85,17 +150,26 @@ class ScrapePrices():
                     (By.CSS_SELECTOR, "[data-test-id='offer-listing']")
                 )
             )
-        finally:
+
+        finally: 
             self.driver.close()
-    
+
+
     def run(self):
         '''runs functions of ScrapePrices() class'''
         self.getProxies()
         self.setupDriver()
-        self.getFlights()
- 
+        flights = self.getFlights()
+
+        return flights
     
 if __name__ == "__main__":
     scrape = ScrapePrices("wfwe")
 
-    results = scrape.run()
+    flights = scrape.run()
+
+    # printing flight info
+    for i, f in enumerate(flights, 1):
+        print(f"[{i}] {f['airline']} | {f['price']} | "
+              f"{f['departure']} → {f['arrival']} | "
+              f"{f['duration']} | {f['stops']}")    
