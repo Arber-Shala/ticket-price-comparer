@@ -4,7 +4,8 @@ import requests
 from bs4 import BeautifulSoup
 import random
 import undetected_chromedriver as uc
-from seleniumwire import webdriver
+# from seleniumwire import webdriver
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException
@@ -16,6 +17,7 @@ import time
 from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager # pip install webdriver-manager
 from selenium.webdriver.chrome.service import Service
+import re
 
 class ScrapePrices():
     '''
@@ -26,7 +28,7 @@ class ScrapePrices():
     def __init__(self, url):
         '''Initializes vaiables to be used in the class'''
         self.driver = ''
-        self.list_of_urls = []
+        self.proxies = list()
         self.website_url = url
         self.path = os.path.dirname(os.path.realpath(__file__)) # current path of folder
     
@@ -37,58 +39,63 @@ class ScrapePrices():
         # get HTML soup and search for table
         soup = BeautifulSoup(r.content, 'html.parser')
         table = soup.find('tbody')
-        total_rows = len(table)
         # get each row of the table and add elite proxies to a proxies.txt file
-        with open("proxies.txt", 'w') as file:
-            for i, row in enumerate(table):
-                if row.find_all('td')[4].text == 'elite proxy' and row.find_all('td')[5].text == 'yes':
-                    proxy = ':'.join([row.find_all('td')[0].text, row.find_all('td')[1].text])
-                    file.write(proxy)
-                    # only add newspace if its not the last line 
-                    if i < total_rows - 1:
-                        file.write('\n')
+        for i, row in enumerate(table):
+            if row.find_all('td')[4].text == 'elite proxy' and row.find_all('td')[5].text == 'yes':
+                proxy = ':'.join([row.find_all('td')[0].text, row.find_all('td')[1].text])
+                self.proxies.append(proxy)
+        
+
     
     def setupDriver(self):
-        '''creates user agents using proxy ip addresses saved in .txt files'''
-        # get list of proxies to use
-        proxies = []
-        # create user agent
+        '''Uses user agents to run a driver on the target url'''
+        # create user agent to mimic a web browser
         user_agent = UserAgent() 
         user_string = user_agent.random # creates a random browser
-        
-        with open("proxies.txt", 'r') as file:
-            for line in file:
-                proxies.append(line)
 
         # get a random proxy
-        random_proxy = random.choice(proxies)
+        random_proxy = random.choice(self.proxies)
 
-        # define selenium options for the proxy server IP addresses
-        seleniumwire_options = {
-            'proxy': {
-                'http': f'http://{random_proxy}',
-                'https': f'https://{random_proxy}',
-                'verify_ss1': False
-            }
-        }
-        # define options for google chrome webdriver tocursomize behaviour
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument(f'--user-agent={user_string}')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.headless = True
-        service = Service(ChromeDriverManager().install())
+        opts = Options()
+        opts.add_argument("--headless=new")
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+        opts.add_argument("--window-size=1920,1080")
+        # opts.add_argument(f"--proxy-server={random_proxy}") # ** using proxy makes scraping much slower
+        opts.add_argument(
+            f"user-agent={user_string}"
+        )
+        self.driver = webdriver.Chrome(options=opts)
+    def getFlights(self):
+        '''get each flight from the website'''
+       
+        self.driver.get('https://www.google.com/travel/flights/search?tfs=CBwQAhooEgoyMDI2LTEyLTIwagwIAhIIL20vMG5saDdyDAgDEggvbS8wamJzNRooEgoyMDI2LTEyLTMxagwIAxIIL20vMGpiczVyDAgCEggvbS8wbmxoN0ABSAFwAYIBCwj___________8BmAEB&tfu=EgoIABABGAAgAigL&hl=en&gl=ca&curr=CAD')
+        time.sleep(5)  # let it settle
+        try:
+            print("works")
 
-        # add data to final driver to be used
-        # self.driver = uc.Chrome(options=chrome_options, seleniumwire_options=seleniumwire_options)
-        #self.driver = uc.Chrome(service = service, options=chrome_options, seleniumwire_options=seleniumwire_options)
-        self.driver = webdriver.Chrome(service=service, seleniumwire_options=seleniumwire_options, options=chrome_options)
+        except:
+            # DEBUG: save screenshot and page source to inspect what loaded (CLAUDE)
+            self.driver.save_screenshot("debug.png")
+            with open("debug.html", "w", encoding="utf-8") as f:
+                f.write(self.driver.page_source)
 
+            WebDriverWait(self.driver, 30).until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "[data-test-id='offer-listing']")
+                )
+            )
+        finally:
+            self.driver.close()
+    
     def run(self):
         '''runs functions of ScrapePrices() class'''
         self.getProxies()
         self.setupDriver()
+        self.getFlights()
+ 
     
 if __name__ == "__main__":
     scrape = ScrapePrices("wfwe")
 
-    scrape.run()
+    results = scrape.run()
