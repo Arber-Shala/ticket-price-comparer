@@ -142,8 +142,6 @@ class ScrapePrices():
             # DEBUG: save screenshot and page source to inspect what loaded (CLAUDE)
             print("Timed out waiting for results. Page may not have loaded.")
             self.driver.save_screenshot("debug.png")
-            with open("debug.html", "w", encoding="utf-8") as f:
-                f.write(self.driver.page_source)
 
             WebDriverWait(self.driver, 30).until(
                 EC.presence_of_element_located(
