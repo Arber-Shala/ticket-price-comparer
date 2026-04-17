@@ -85,9 +85,8 @@ class ScrapePrices():
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "li.pIav2d"))
             )
-            time.sleep(5)  # let remaining results render
 
-            # scroll to trigger lazy-loaded results
+            #scroll to trigger lazy-loaded results
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
 
@@ -96,7 +95,7 @@ class ScrapePrices():
 
             # Google Flights wraps each result in a <li> inside ul.Rk10dc
             result_items = soup.select("ul.Rk10dc li")      
-              
+    
             # create list of flight dictionaries
             flights = list()
             
@@ -136,7 +135,7 @@ class ScrapePrices():
                     print(f"Skipping a result due to parse error: {e}")
                     continue
 
-                return flights
+            return flights
 
         except:
             # DEBUG: save screenshot and page source to inspect what loaded (CLAUDE)
@@ -165,9 +164,9 @@ if __name__ == "__main__":
     scrape = ScrapePrices("wfwe")
 
     flights = scrape.run()
-
     # printing flight info
-    for i, f in enumerate(flights, 1):
+    for i, f in enumerate(flights):
         print(f"[{i}] {f['airline']} | {f['price']} | "
               f"{f['departure']} → {f['arrival']} | "
               f"{f['duration']} | {f['stops']}")    
+    
