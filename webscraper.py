@@ -18,6 +18,9 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager # pip install webdriver-manager
 from selenium.webdriver.chrome.service import Service
 import re
+import base64
+import re
+from urllib.parse import urlparse, parse_qs
 
 class ScrapePrices():
     '''
@@ -68,17 +71,37 @@ class ScrapePrices():
         # self.driver = webdriver.Chrome(options=opts)
         self.driver = uc.Chrome(options=opts) # use undetected_chromedriver because google blocks default selenium headless
 
+
+    def extractDatesFromUrl(self, url: str) -> dict:
+        """Decodes departure and return dates from the Google Flights tfs parameter."""
+        dates = {"outbound": "N/A", "return": "N/A"}
+        try:
+            params = parse_qs(urlparse(url).query)
+            tfs_b64 = params.get("tfs", [""])[0]
+            # Pad and decode base64
+            padded = tfs_b64 + "=" * (-len(tfs_b64) % 4)
+            decoded = base64.urlsafe_b64decode(padded).decode("latin-1")
+            # Dates are embedded as YYYY-MM-DD strings
+            found = re.findall(r"(\d{4}-\d{2}-\d{2})", decoded)
+            if len(found) >= 1:
+                dates["outbound"] = found[0]
+            if len(found) >= 2:
+                dates["return"] = found[1]
+        except Exception as e:
+            print(f"Could not decode dates from URL: {e}")
+        return dates
+    
     def getFlights(self):
         '''get each flight from the website'''
-       
-        self.driver.get('https://www.google.com/travel/flights/search?tfs=CBwQAhooEgoyMDI2LTEyLTIwagwIAhIIL20vMG5saDdyDAgDEggvbS8wamJzNRooEgoyMDI2LTEyLTMxagwIAxIIL20vMGpiczVyDAgCEggvbS8wbmxoN0ABSAFwAYIBCwj___________8BmAEB&tfu=EgoIABABGAAgAigL&hl=en&gl=ca&curr=CAD')
+        url = 'https://www.google.com/travel/flights/search?tfs=CBwQAhooEgoyMDI2LTEyLTIwagwIAhIIL20vMG5saDdyDAgDEggvbS8wamJzNRooEgoyMDI2LTEyLTMxagwIAxIIL20vMGpiczVyDAgCEggvbS8wbmxoN0ABSAFwAYIBCwj___________8BmAEB&tfu=EgoIABABGAAgAigL&hl=en&gl=ca&curr=CAD'
+        self.driver.get(url)
         time.sleep(5)  # let it settle
         #==================================================================
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
-        print("Page title:", self.driver.title)
-        print("CAD in page:", "CAD" in self.driver.page_source)
-        print("Total <li> tags:", len(soup.find_all("li")))
-        print("Total <div> tags:", len(soup.find_all("div")))
+        # print("Page title:", self.driver.title)
+        # print("CAD in page:", "CAD" in self.driver.page_source)
+        # print("Total <li> tags:", len(soup.find_all("li")))
+        # print("Total <div> tags:", len(soup.find_all("div")))
          #==================================================================
         try:
             # wait until page finishes opening before scraping
@@ -96,6 +119,9 @@ class ScrapePrices():
             # Google Flights wraps each result in a <li> inside ul.Rk10dc
             result_items = soup.select("ul.Rk10dc li")      
     
+            # get departure and return dates
+            dates = self.extractDatesFromUrl(url)
+
             # create list of flight dictionaries
             flights = list()
             
@@ -103,21 +129,35 @@ class ScrapePrices():
                 try:
                     flight = {}
 
+                    flight["title"] = self.driver.title
                     # Price — typically inside a div with class YMlIz or FpEdX
-                    price_el = item.select_one("div.YMlIz span, div.FpEdX span")
+                    price_el = (
+                        item.select_one("span[aria-label*='CAD']") or
+                        item.select_one("div.FpEdX") or
+                        item.select_one("div.YMlIz") or
+                        item.select_one("[data-gs] span")
+                    )
                     flight["price"] = price_el.get_text(strip=True) if price_el else "N/A"
 
                     # Airline name
                     airline_el = item.select_one("div.sSHqwe span, span.h1fkLb")
                     flight["airline"] = airline_el.get_text(strip=True) if airline_el else "N/A"
 
+                    # Departure and return dates
+                    flight["departure_date"] = dates["outbound"]  # e.g. "2026-12-20"
+                    flight["return_date"] = dates["return"] 
+
                     # Departure and arrival times
-                    times = item.select("span.mv1WYe span[jscontroller]")
-                    if len(times) >= 2:
-                        flight["departure"] = times[0].get_text(strip=True)
-                        flight["arrival"] = times[1].get_text(strip=True)
-                    else:
-                        flight["departure"] = flight["arrival"] = "N/A"
+                    dep_el = item.select_one("span[aria-label*='Departure time']")
+                    arr_el = item.select_one("span[aria-label*='Arrival time']")
+                    flight["departure_time"] = dep_el.get_text(strip=True) if dep_el else "N/A"
+                    flight["arrival_time"] = arr_el.get_text(strip=True) if arr_el else "N/A"
+                    # times = item.select("span.mv1WYe span[jscontroller]")
+                    # if len(times) >= 2:
+                    #     flight["departure"] = times[0].get_text(strip=True)
+                    #     flight["arrival"] = times[1].get_text(strip=True)
+                    # else:
+                    #     flight["departure"] = flight["arrival"] = "N/A"
 
                     # Duration
                     duration_el = item.select_one("div.Ak5kof div, span.pIgMWd")
@@ -165,8 +205,19 @@ if __name__ == "__main__":
 
     flights = scrape.run()
     # printing flight info
-    for i, f in enumerate(flights):
-        print(f"[{i}] {f['airline']} | {f['price']} | "
-              f"{f['departure']} → {f['arrival']} | "
-              f"{f['duration']} | {f['stops']}")    
+    # for i, f in enumerate(flights):
+    #     print(f"[{i}] {f['airline']} | {f['price']} | "
+    #           f"{f['departure']} → {f['arrival']} | "
+    #           f"{f['duration']} | {f['stops']}")  
+    print('title', flights[0]['title'])  
+    print('airline', flights[0]['airline'])
+    print('price', flights[0]['price'])
+    print('departure_date', flights[0]['departure_date'])
+    print('return_date', flights[0]['return_date'])
+    print('departure_time', flights[0]['departure_time'])
+    print('arrival_time', flights[0]['arrival_time'])
+    print('duration', flights[0]['duration'])
+    print('stops', flights[0]['stops'])
+
+    
     
