@@ -22,7 +22,7 @@ import base64
 import re
 from urllib.parse import urlparse, parse_qs
 
-class ScrapePrices():
+class ScrapeFlights():
     '''
     Scrapes price data from websites
     Input: url
@@ -201,7 +201,7 @@ class ScrapePrices():
         return flights
     
 if __name__ == "__main__":
-    scrape = ScrapePrices("wfwe")
+    scrape = ScrapeFlights("wfwe")
 
     flights = scrape.run()
     # printing flight info
