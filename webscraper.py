@@ -93,8 +93,7 @@ class ScrapeFlights():
     
     def getFlights(self):
         '''get each flight from the website'''
-        url = 'https://www.google.com/travel/flights/search?tfs=CBwQAhooEgoyMDI2LTEyLTIwagwIAhIIL20vMG5saDdyDAgDEggvbS8wamJzNRooEgoyMDI2LTEyLTMxagwIAxIIL20vMGpiczVyDAgCEggvbS8wbmxoN0ABSAFwAYIBCwj___________8BmAEB&tfu=EgoIABABGAAgAigL&hl=en&gl=ca&curr=CAD'
-        self.driver.get(url)
+        self.driver.get(self.website_url)
         time.sleep(5)  # let it settle
         #==================================================================
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
@@ -105,7 +104,7 @@ class ScrapeFlights():
          #==================================================================
         try:
             # wait until page finishes opening before scraping
-            WebDriverWait(self.driver, 10).until(
+            WebDriverWait(self.driver, 5).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "li.pIav2d"))
             )
 
@@ -120,7 +119,7 @@ class ScrapeFlights():
             result_items = soup.select("ul.Rk10dc li")      
     
             # get departure and return dates
-            dates = self.extractDatesFromUrl(url)
+            dates = self.extractDatesFromUrl(self.website_url)
 
             # create list of flight dictionaries
             flights = list()
@@ -180,9 +179,9 @@ class ScrapeFlights():
         except:
             # DEBUG: save screenshot and page source to inspect what loaded (CLAUDE)
             print("Timed out waiting for results. Page may not have loaded.")
-            self.driver.save_screenshot("debug.png")
+            self.driver.save_screenshot("debug/debug.png")
 
-            WebDriverWait(self.driver, 30).until(
+            WebDriverWait(self.driver, 5).until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "[data-test-id='offer-listing']")
                 )
@@ -201,7 +200,8 @@ class ScrapeFlights():
         return flights
     
 if __name__ == "__main__":
-    scrape = ScrapeFlights("wfwe")
+    # pass in URL
+    scrape = ScrapeFlights('https://www.google.com/travel/flights/search?tfs=CBwQAhooEgoyMDI2LTEyLTIwagwIAhIIL20vMG5saDdyDAgDEggvbS8wamJzNRooEgoyMDI2LTEyLTMxagwIAxIIL20vMGpiczVyDAgCEggvbS8wbmxoN0ABSAFwAYIBCwj___________8BmAEB&tfu=EgoIABABGAAgAigL&hl=en&gl=ca&curr=CAD')
 
     flights = scrape.run()
     # printing flight info
