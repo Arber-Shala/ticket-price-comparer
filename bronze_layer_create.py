@@ -14,13 +14,20 @@ cursor = connection.cursor()
 connection.autocommit = True
 
 try: 
-    cursor.execute(
-        """
-            CREATE TABLE flights(
-                flightID INT,
-                title STR,
-                airline STR,
-                
+    cursor.execute( 
+        """ 
+            DROP TABLE IF EXISTS flights;
+            CREATE TABLE flights(  
+                flightID INT PRIMARY KEY,
+                title VARCHAR(100),
+                airline VARCHAR(100),
+                price VARCHAR(100),
+                departure_date DATE,
+                return_date DATE,
+                departure_time VARCHAR(100),
+                arrival_time VARCHAR(100),
+                duration VARCHAR(100),
+                stops VARCHAR(100)
             )
         """
     )

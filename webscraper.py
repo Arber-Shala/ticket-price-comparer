@@ -68,8 +68,8 @@ class ScrapeFlights():
         opts.add_argument(
             f"user-agent={user_string}"
         )
-        # self.driver = webdriver.Chrome(options=opts)
-        self.driver = uc.Chrome(options=opts) # use undetected_chromedriver because google blocks default selenium headless
+        self.driver = webdriver.Chrome(options=opts)
+        #self.driver = uc.Chrome(options=opts) # use undetected_chromedriver because google blocks default selenium headless
 
 
     def extractDatesFromUrl(self, url: str) -> dict:
@@ -206,8 +206,9 @@ if __name__ == "__main__":
     flights = scrape.run()
     # printing flight info
     # for i, f in enumerate(flights):
-    #     print(f"[{i}] {f['airline']} | {f['price']} | "
-    #           f"{f['departure']} → {f['arrival']} | "
+    #     print(f"[{i}] {f['title']} | {f['airline']} | {f['price']} | "
+    #           f"{f['departure_date']} → {f['return_date']} | "
+    #           f"{f['departure_time']} → {f['arrival_time']} | "
     #           f"{f['duration']} | {f['stops']}")  
     print('title', flights[0]['title'])  
     print('airline', flights[0]['airline'])
